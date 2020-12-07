@@ -311,7 +311,7 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   pte_t *pte;
   uint64 pa, i;
   uint flags;
-  char *mem;
+  //char *mem;
 
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walk(old, i, 0)) == 0)
@@ -320,7 +320,7 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
       panic("uvmcopy: page not present");
     pa = PTE2PA(*pte);
     flags = PTE_FLAGS(*pte);
-    if(*pre & PTE_W){
+    if(*pte & PTE_W){
         *pte ^= PTE_W;
         *pte |= PTE_COW;
     }
@@ -338,18 +338,23 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   uvmunmap(new, 0, i / PGSIZE, 1);
   return -1;
 }
-int _uvmcow(pte_t *pre){
+int _uvmcow(pte_t *pte){
+
+    uint64 pa;
+    uint flags;
+    char *mem;
+
     // alokovat stranku
     // skopirovat pamet
     // namapovat ju
 
     if((mem = kalloc()) == 0){
-        return -1 // ak uz nemame pamet
+        return -1 ;// ak uz nemame pamet
     }
     // ak je stranka alokovana skopirujeme obsah tej stranky
     //mem je nova stranka pa je stara
-    pa = PTE2PA(*pre);
-    memove(mem, (char*)pa , PGSIZE);
+    pa = PTE2PA(*pte);
+    memmove(mem, (char*)pa , PGSIZE);
     // vratit priznaky
     *pte |= PTE_W;
     *pte ^= PTE_COW;
@@ -367,7 +372,7 @@ int uvmcow(pagetable_t pagetable , uint64 fallut_addr){
         return -1;
     }
     if((*pte & PTE_V) == 0) {// ci je mapovanie validne
-        return -1
+        return -1;
     }
     if((*pte & PTE_COW) == 0){// ci sa jedna o COW stranku
         return -1;
