@@ -320,11 +320,15 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
       panic("uvmcopy: page not present");
     pa = PTE2PA(*pte);
     flags = PTE_FLAGS(*pte);
-    if((mem = kalloc()) == 0)
+    if(*pre & PTE_W){
+        *pte ^= PTE_W;
+        *pte |= PTE_COW;
+    }
+    /*if((mem = kalloc()) == 0)
       goto err;
-    memmove(mem, (char*)pa, PGSIZE);
-    if(mappages(new, i, PGSIZE, (uint64)mem, flags) != 0){
-      kfree(mem);
+    memmove(mem, (char*)pa, PGSIZE);*/
+    if(mappages(new, i, PGSIZE, (uint64)pa, flags) != 0){
+      //kfree(mem);
       goto err;
     }
   }
@@ -333,6 +337,42 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
  err:
   uvmunmap(new, 0, i / PGSIZE, 1);
   return -1;
+}
+int _uvmcow(pte_t *pre){
+    // alokovat stranku
+    // skopirovat pamet
+    // namapovat ju
+
+    if((mem = kalloc()) == 0){
+        return -1 // ak uz nemame pamet
+    }
+    // ak je stranka alokovana skopirujeme obsah tej stranky
+    //mem je nova stranka pa je stara
+    pa = PTE2PA(*pre);
+    memove(mem, (char*)pa , PGSIZE);
+    // vratit priznaky
+    *pte |= PTE_W;
+    *pte ^= PTE_COW;
+    // vyskladat flagy
+    flags = PTE_FLAGS(*pte);
+    *pte = PA2PTE(mem) | flags;
+
+    return  0;
+}
+
+int uvmcow(pagetable_t pagetable , uint64 fallut_addr){
+
+    pte_t *pte;
+    if((pte = walk(pagetable, PGROUNDDOWN(fallut_addr), 0)) == 0) {
+        return -1;
+    }
+    if((*pte & PTE_V) == 0) {// ci je mapovanie validne
+        return -1
+    }
+    if((*pte & PTE_COW) == 0){// ci sa jedna o COW stranku
+        return -1;
+    }
+    return _uvmcow(pte);
 }
 
 // mark a PTE invalid for user access.
